@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:io' show Platform;
+
 
 
 
@@ -19,6 +22,15 @@ class _HomeWithGPSState extends State<HomeWithGPS> {
   void initState() {
     super.initState();
     getPos();
+   
+  }
+
+  void startServiceInPlatform() async{
+    if(Platform.isAndroid){
+      var methodChannel = MethodChannel("com.lara.bru.rastreio.messages");
+      String data = await methodChannel.invokeMethod("startService");
+      debugPrint(data);
+    }
   }
   
   void getPos() async{
@@ -72,7 +84,10 @@ class _HomeWithGPSState extends State<HomeWithGPS> {
       color: Colors.white,
       child: Center(
         child:RaisedButton(
-            child: Text("Rodar")
+            child: Text("Rodar"),
+            onPressed: (){
+              startServiceInPlatform();
+            },
           ),
         )
     );

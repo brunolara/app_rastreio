@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'Rastreio.dart';
+// import 'Rastreio.dart';
 import '../parts/base.dart';
 
 class Options{
@@ -50,7 +50,7 @@ class OpcaoCard extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final TextStyle textStyle = Theme.of(context).textTheme.display1;
+    // final TextStyle textStyle = Theme.of(context).textTheme.display1;
     return InkWell(
       child: Card(
             color: Colors.white,

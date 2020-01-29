@@ -5,10 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 String parseDate({str, formatDateTime = false}){
   var aux = str.split('T');
   var data = aux[0].split('-');
-  String data_parsed = '';
+  String dateParsed = '';
   if(formatDateTime) return aux[0].toString();
-  else data_parsed = data[2] +'/'+ data[1] +'/'+ abreviateYear(data[0]);
-  return data_parsed +' '+aux[1];
+  else dateParsed = data[2] +'/'+ data[1] +'/'+ abreviateYear(data[0]);
+  return dateParsed +' '+aux[1];
 }
 
   

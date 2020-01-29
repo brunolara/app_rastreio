@@ -155,6 +155,7 @@ class _RastreioState extends State<Rastreio> {
       if(aux1.isAtSameMomentAs(aux2)) return 0;
       if(aux1.isAfter(aux2)) return 1;
     }
+    return 0;
   }
 
   Widget listBuild(context, snapshot){
