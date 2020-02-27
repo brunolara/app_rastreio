@@ -16,11 +16,30 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 
+import com.github.nkzawa.socketio.client.IO;
+import com.github.nkzawa.socketio.client.Socket;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.net.URISyntaxException;
+
 public class MyService  extends Service {
     private static final String TAG = "BOOMBOOMTESTGPS";
     private LocationManager mLocationManager = null;
     private static final int LOCATION_INTERVAL = 1000;
     private static final float LOCATION_DISTANCE = 10f;
+
+    private Socket mSocket;
+    {
+        try {
+            IO.Options opts = new IO.Options();
+
+
+            mSocket = IO.socket("http://191.252.191.81:3000");
+            Log.e(TAG, "Conectou socket");
+        } catch (URISyntaxException e) {}
+    }
 
     private class LocationListener implements android.location.LocationListener {
         Location mLastLocation;
@@ -30,10 +49,28 @@ public class MyService  extends Service {
             mLastLocation = new Location(provider);
         }
 
+        public String convert(Location location) throws JSONException {
+            JSONObject data = new JSONObject();
+            data.put("lan", location.getLatitude());
+            data.put("lng", location.getLongitude());
+
+            return data.toString();
+        }
+
         @Override
         public void onLocationChanged(Location location) {
+
+
             Log.e(TAG, "onLocationChanged: " + location);
             mLastLocation.set(location);
+            if(mSocket.connected()){
+                Log.e(TAG, "emit");
+                try {
+                    mSocket.emit("new-location", convert(location));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         @Override
@@ -60,6 +97,8 @@ public class MyService  extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.e(TAG, "onStartCommand");
+
+        mSocket.connect();
         super.onStartCommand(intent, flags, startId);
         return START_STICKY;
     }
@@ -70,6 +109,7 @@ public class MyService  extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
 //            NotificationManager manager = getSystemService(NotificationManager.class);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "messages")
@@ -104,7 +144,10 @@ public class MyService  extends Service {
     @Override
     public void onDestroy() {
         Log.e(TAG, "onDestroy");
+
         super.onDestroy();
+        mSocket.disconnect();
+
         if (mLocationManager != null) {
             for (int i = 0; i < mLocationListeners.length; i++) {
                 try {
