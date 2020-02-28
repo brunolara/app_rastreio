@@ -2,9 +2,13 @@ package com.lara.bru.rastreio;
 
 
 import android.app.Service;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -18,25 +22,32 @@ import androidx.core.app.NotificationCompat;
 
 import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
+import com.lara.bru.rastreio.DbContext.DBHelper;
+import com.lara.bru.rastreio.DbContext.PostContract;
+import com.lara.bru.rastreio.DbContext.PostDbHelper;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.URISyntaxException;
+import java.time.Instant;
+import java.util.List;
 
 public class MyService  extends Service {
     private static final String TAG = "BOOMBOOMTESTGPS";
     private LocationManager mLocationManager = null;
     private static final int LOCATION_INTERVAL = 1000;
     private static final float LOCATION_DISTANCE = 10f;
+    private DBHelper db = null;
+
 
     private Socket mSocket;
     {
         try {
             IO.Options opts = new IO.Options();
 
-
-            mSocket = IO.socket("http://191.252.191.81:3000");
+            opts.reconnection = true;
+            mSocket = IO.socket("http://191.252.191.81:3000", opts);
             Log.e(TAG, "Conectou socket");
         } catch (URISyntaxException e) {}
     }
@@ -59,17 +70,12 @@ public class MyService  extends Service {
 
         @Override
         public void onLocationChanged(Location location) {
-
-
             Log.e(TAG, "onLocationChanged: " + location);
-            mLastLocation.set(location);
-            if(mSocket.connected()){
-                Log.e(TAG, "emit");
-                try {
-                    mSocket.emit("new-location", convert(location));
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
+            Cordinate cor = new Cordinate("TOKEN", "" + location.getLatitude(), "" +location.getLongitude() );
+            db.saveCordinates(cor);
+            List<Cordinate> aux = db.getAll();
+            for (Cordinate item: aux) {
+                System.out.println(item.token +" - "+ item.lan +" - "+ item.lng +" - "+ item.data);
             }
         }
 
@@ -94,6 +100,7 @@ public class MyService  extends Service {
             new LocationListener(LocationManager.NETWORK_PROVIDER)
     };
 
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.e(TAG, "onStartCommand");
@@ -108,6 +115,9 @@ public class MyService  extends Service {
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     public void onCreate() {
+
+        db = new DBHelper(this);
+
         super.onCreate();
 
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
