@@ -1,5 +1,8 @@
 package com.lara.bru.rastreio;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Cordinate {
 
     public int id = 0;
@@ -32,5 +35,15 @@ public class Cordinate {
         this.lng = lng;
         this.status = 0;
         this.data = "" + (System.currentTimeMillis() / 1000L);
+    }
+
+    public Map<String, String> toParam(){
+        Map<String, String>  params = new HashMap<String, String>();
+
+        params.put("lan", lan);
+        params.put("lng", lng);
+        params.put("token", token);
+        params.put("data", data);
+        return params;
     }
 }
