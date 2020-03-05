@@ -16,24 +16,33 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.lara.bru.rastreio.DbContext.DBHelper;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MyService  extends Service {
+public class MyService extends Service {
     private static final String TAG = "BOOMBOOMTESTGPS";
     private LocationManager mLocationManager = null;
-    private static final int LOCATION_INTERVAL = 1000;
-    private static final float LOCATION_DISTANCE = 10f;
+    private static final int LOCATION_INTERVAL = 1500;
+    private static final float LOCATION_DISTANCE = 35f;
+    //dbvar
     private DBHelper db = null;
-    RequestHelper requestHelper = null;
+    //request vars
+    private String endPoint = "http://191.252.191.81:3000/sendCord";
+    Map<String, String> params;
+    RequestQueue queue;
 
     private class LocationListener implements android.location.LocationListener {
         Location mLastLocation;
@@ -45,8 +54,9 @@ public class MyService  extends Service {
 
         public String convert(List<Cordinate> location) throws JSONException {
             JSONArray data = new JSONArray();
-            for(Cordinate item: location){
+            for (Cordinate item : location) {
                 JSONObject aux = new JSONObject();
+                aux.put("id", item.id);
                 aux.put("lan", item.lan);
                 aux.put("lng", item.lng);
                 aux.put("data", item.data);
@@ -56,10 +66,45 @@ public class MyService  extends Service {
             return data.toString();
         }
 
+        public void sendData() {
+            StringRequest postRequest = new StringRequest(Request.Method.POST, endPoint,
+                    response -> {
+                        try {
+                            JSONArray data = new JSONArray(response);
+                            for (int i = 0; i < data.length(); i++) {
+                                JSONObject a = data.getJSONObject(i);
+                                //o server vai retornar os objetos que foram enviados
+                                //ele salva os status no bd
+                                db.changeStatus(a.getInt("id"), 1);
+                            }
+                            System.out.println();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        // response
+                        Log.d("Sucesso", response);
+                    },
+                    error -> {
+                        // error
+                        System.out.println("Exectuando o evento de erro");
+                    }
+            ) {
+                @Override
+                protected Map<String, String> getParams() {
+                    return params;
+                }
+            };
+
+            // Add the request to the RequestQueue.
+            queue.add(postRequest);
+
+        }
+
         //se for apenas um elemento, adiciona no array, e envia
         public String convert(Cordinate location) throws JSONException {
             JSONArray data = new JSONArray();
             JSONObject aux = new JSONObject();
+            aux.put("id", location.id);
             aux.put("lan", location.lan);
             aux.put("lng", location.lng);
             aux.put("data", location.data);
@@ -71,15 +116,21 @@ public class MyService  extends Service {
         @Override
         public void onLocationChanged(Location location) {
             Log.e(TAG, "onLocationChanged: " + location);
-            Cordinate cor = new Cordinate("TOKEN", "" + location.getLatitude(), "" +location.getLongitude());
+            Cordinate cor = new Cordinate("TOKEN", "" + location.getLatitude(), "" + location.getLongitude());
 
             try {
-                String jsonData = convert(cor);
-                requestHelper.setData(jsonData);
-                StringRequest response = requestHelper.makeRequest();
-                System.out.println(response.deliverError());
-            } catch (JSONException e) {
-                e.printStackTrace();
+                db.saveCordinates(cor);
+
+                List<Cordinate> aux = db.getUnsync();
+                String jsonData = convert(aux);
+
+                params = new HashMap<String, String>();
+                params.put("data", jsonData);
+                sendData();
+
+//                System.out.println(response);
+            } catch (Exception ex) {
+                System.out.println("erro ao salvar no bd: " + ex);
             }
 
 //            db.saveCordinates(cor);
@@ -119,24 +170,22 @@ public class MyService  extends Service {
     }
 
 
-
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     public void onCreate() {
 
-        requestHelper = new RequestHelper(this);
-
+        queue = Volley.newRequestQueue(this);
         db = new DBHelper(this);
 
         super.onCreate();
 
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 //            NotificationManager manager = getSystemService(NotificationManager.class);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "messages")
                     .setContentText("está rodando em back")
                     .setContentTitle("Flutter back")
                     .setSmallIcon(R.drawable.common_google_signin_btn_icon_dark);
-            startForeground(101,builder.build());
+            startForeground(101, builder.build());
         }
 
         Log.e(TAG, "onCreate");
@@ -192,7 +241,6 @@ public class MyService  extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
-
 
 
 }
