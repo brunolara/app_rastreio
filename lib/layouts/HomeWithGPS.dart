@@ -46,17 +46,23 @@ class _HomeWithGPSState extends State<HomeWithGPS> {
       color: Colors.white,
       child: Center(
         child:RaisedButton(
-            child: Text("Rodar"),
+            child: Text(serviceStatus ? "Para":"Rodar"),
             onPressed: (){
             
               setState(() {
                 if(serviceStatus == false) {
-                  serviceStatus = true;
-                  startServiceInPlatform();
+                  setState(() {
+                    serviceStatus = true;
+                    startServiceInPlatform();    
+                  });
+                
                 }
                 else {
-                  serviceStatus = false;
-                  stopServiceInPlatform();
+                  setState(() {
+                    serviceStatus = false;
+                    stopServiceInPlatform();    
+                  });
+                
                 }
               });
             },

@@ -1,31 +1,18 @@
 package com.lara.bru.rastreio;
 
-
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.app.Service;
 import android.content.Context;
-import android.content.Intent;
-
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.Binder;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.PowerManager;
-import android.provider.Settings;
 import android.util.Log;
 
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
-import androidx.core.app.NotificationCompat;
+import androidx.annotation.NonNull;
+import androidx.work.Worker;
+import androidx.work.WorkerParameters;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.lara.bru.rastreio.DbContext.DBHelper;
@@ -34,23 +21,23 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MyService extends Service {
+public class MyLocationWorker extends Worker {
+
     private static final String TAG = "BOOMBOOMTESTGPS";
     private LocationManager mLocationManager = null;
     private static final int LOCATION_INTERVAL = 1500;
     private static final float LOCATION_DISTANCE = 35f;
-    private final LocationServiceBinder binder = new LocationServiceBinder();
     //dbvar
     private DBHelper db = null;
     //request vars
     private String endPoint = "http://191.252.191.81:3000/sendCord";
     Map<String, String> params;
     RequestQueue queue;
+
 
     private class LocationListener implements android.location.LocationListener {
         Location mLastLocation;
@@ -124,12 +111,6 @@ public class MyService extends Service {
 
         @Override
         public void onLocationChanged(Location location) {
-
-
-
-            PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-            PowerManager.WakeLock mWakelock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG+":tag");
-            mWakelock.acquire();
             Cordinate cor = new Cordinate("TOKEN", "" + location.getLatitude(), "" + location.getLongitude());
 
             try {
@@ -146,8 +127,6 @@ public class MyService extends Service {
             } catch (Exception ex) {
                 System.out.println("erro ao salvar no bd: " + ex);
             }
-
-            mWakelock.release();
 
 //            db.saveCordinates(cor);
 //            List<Cordinate> aux = db.getAll();
@@ -172,106 +151,42 @@ public class MyService extends Service {
         }
     }
 
-    LocationListener[] mLocationListeners = null;
+    LocationListener[] mLocationListeners = new LocationListener[]{
+            new LocationListener(LocationManager.GPS_PROVIDER),
+            new LocationListener(LocationManager.NETWORK_PROVIDER)
+    };
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
-    private Notification getNotification() {
-        NotificationChannel channel = new NotificationChannel(
-                "channel_01",
-                "My Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
-        );
-        NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.createNotificationChannel(channel);
-        Notification.Builder builder = new Notification.Builder(getApplicationContext(), "channel_01");
-        return builder.build();
+    public MyLocationWorker(
+            @NonNull Context context,
+            @NonNull WorkerParameters params) {
+        super(context, params);
     }
-
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.e(TAG, "onStartCommand");
-        super.onStartCommand(intent, flags, startId);
-        return START_NOT_STICKY;
-    }
+    public Result doWork() {
+        queue = Volley.newRequestQueue(getApplicationContext());
+        db = new DBHelper(getApplicationContext());
 
-    public void startTracking() {
-        initializeLocationManager();
 
-        mLocationListeners = new LocationListener[]{
-                new LocationListener(LocationManager.GPS_PROVIDER),
-//                new LocationListener(LocationManager.NETWORK_PROVIDER)
-        };
-
+        try {
+            mLocationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER, LOCATION_INTERVAL, LOCATION_DISTANCE,
+                    mLocationListeners[1]);
+        } catch (java.lang.SecurityException ex) {
+            Log.i(TAG, "fail to request location update, ignore", ex);
+        } catch (IllegalArgumentException ex) {
+            Log.d(TAG, "network provider does not exist, " + ex.getMessage());
+        }
         try {
             mLocationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER, LOCATION_INTERVAL, LOCATION_DISTANCE,
                     mLocationListeners[0]);
-        } catch (SecurityException ex) {
+        } catch (java.lang.SecurityException ex) {
             Log.i(TAG, "fail to request location update, ignore", ex);
         } catch (IllegalArgumentException ex) {
             Log.d(TAG, "gps provider does not exist " + ex.getMessage());
         }
 
+        return Result.success();
     }
-
-
-    @Override
-    public void onCreate() {
-
-        queue = Volley.newRequestQueue(this);
-        db = new DBHelper(this);
-
-        Log.e(TAG, "onCreate");
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForeground(12345678, getNotification());
-        }
-
-        super.onCreate();
-    }
-
-    public void stopTracking() {
-        this.onDestroy();
-    }
-
-    @Override
-    public void onDestroy() {
-        Log.e(TAG, "onDestroy");
-
-        super.onDestroy();
-
-        if (mLocationManager != null) {
-            for (int i = 0; i < mLocationListeners.length; i++) {
-                try {
-                    mLocationManager.removeUpdates(mLocationListeners[i]);
-                } catch (Exception ex) {
-                    Log.i(TAG, "fail to remove location listners, ignore", ex);
-                }
-            }
-        }
-    }
-
-    private void initializeLocationManager() {
-        Log.e(TAG, "initializeLocationManager");
-        if (mLocationManager == null) {
-            mLocationManager = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
-        }
-    }
-
-    public class LocationServiceBinder extends Binder {
-        public MyService getService() {
-            return MyService.this;
-        }
-    }
-
-
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return binder;
-    }
-
-
 }
