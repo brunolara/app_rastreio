@@ -31,12 +31,20 @@ class _RastreioState extends State<Rastreio> {
     }
   }
   Future<Map> _getApi() async{
-    http.Response response;
+    String res;
+    HttpClient _client = new HttpClient();
+    _client.badCertificateCallback = (X509Certificate cert, String host, int port) => true; 
+    HttpClientRequest request;
+    HttpClientResponse  response;
     if(search != null && search != ''){
-      response = await http.get("http://apps.transp.net/rastreiocarga/api/embarque/relatorio?chaveRastreio=$search");
+      request = await _client.getUrl(Uri.parse("https://apps.transp.net/rastreiocarga/api/embarque/relatorio/$search"));
       if(context != null) FocusScope.of(context).requestFocus(FocusNode());
+
+      response = await request.close();
+
+      res = await response.transform(utf8.decoder).join();
       
-      var data = json.decode(response.body);
+      var data = json.decode(res);
       // print(data['errors']);
       if(data['errors'] == null){
         var history = await readHistory();
@@ -52,9 +60,8 @@ class _RastreioState extends State<Rastreio> {
         saveHistory(history);
       } 
     }
-
-    return json.decode(response.body);
   }
+
   
   @override
   Widget build(BuildContext context) {
