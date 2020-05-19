@@ -61,8 +61,10 @@ class _RastreioState extends State<Rastreio> {
         saveHistory(history);
       } 
     }
-  }
 
+    return json.decode(res);
+  }
+  
   
   @override
   Widget build(BuildContext context) {

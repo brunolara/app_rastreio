@@ -8,7 +8,7 @@ import 'layouts/Rastreio.dart';
 
 void main() async{
   runApp(MaterialApp(
-    home: HomeWithGPS(),
+    home: Home(),
     routes: <String, WidgetBuilder> {
       '/Home': (context) => Home(),
       '/Rastreio': (context) => Rastreio()
